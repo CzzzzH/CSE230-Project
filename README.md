@@ -15,9 +15,9 @@ In this project, we will also implement the card game: "High Low."
 Initially, each player receives three randomly drawn cards from their deck. Gameplay involves selecting one card from three, comparing values, and the winner wins both cards. If two cards match, the next round's winner wins not only the current two cards but also any previous matching cards. The game ends when both players have no cards left in their hands, and the player with the greater total number of cards wins.
 
 Tips:
-1. Each player has a deck consisting of 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, and A, a total of 13 cards. The card values increase from 2 to A.
-2. Card values remain hidden until they are compared.
-3. After each comparison, a new card is randomly drawn from the deck to replenish their hand, keeping it at three cards until there are no more cards in the deck.
++ Each player has a deck consisting of 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, and A, a total of 13 cards. The card values increase from 2 to A.
++ Card values remain hidden until they are compared.
++ After each comparison, a new card is randomly drawn from the deck to replenish their hand, keeping it at three cards until there are no more cards in the deck.
 
 ## Goals
 The project consists of the following goals organized as milestones.
