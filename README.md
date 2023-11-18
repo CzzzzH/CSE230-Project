@@ -3,6 +3,7 @@
 # Group Member
 + Xiaoda Li (xil204@ucsd.edu)
 + Yanran Li (aran230505a@gmail.com)
++ Yiqiao Qiu (y7qiu@ucsd.edu)
 
 # Proposal
 This project is a collection of board and card games.
