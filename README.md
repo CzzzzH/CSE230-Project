@@ -10,6 +10,15 @@
 
 
 
+## Run
+
+```shell
+stack setup
+stack run
+```
+
+
+
 ## Proposal
 
 We plan to implement a mini game platform in this project, on which players can play a collection of board and card games. Currently we plan to create two games on the platform: **Reversi** and **High Low**, and both of them are two-player games. The platform and the games will be implemented using the  [Brick](https://github.com/jtdaugherty/brick/) library and be run on a TUI.
