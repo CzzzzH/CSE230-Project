@@ -51,6 +51,7 @@ executables:
     - containers
     - vty
     - vty-crossplatform
+    - random
 
 tests:
   CGA-test:
