@@ -3,12 +3,19 @@
 module Reversi_logic where
 
 import qualified Brick.Main as M
-import Brick.Types (Widget)
+-- import Brick
+-- import Brick.BChan
+-- import Brick.Widgets.Center
+-- import Brick.Widgets.Border
+-- import Brick.Widgets.Border.Style
+import Brick.Types (Widget, EventM)
 import Brick.Widgets.Core (str, vBox)
 import Brick.AttrMap (attrMap)
 import Brick.Util (on)
 import Text.Read (readMaybe)
 import Control.Monad (forever)
+import Control.Lens (makeLenses)
+import Control.Monad.IO.Class (liftIO)
 import Debug.Trace
 import System.Exit (exitSuccess)
 
@@ -18,7 +25,7 @@ boardSize :: Int
 boardSize = 8
 
 -- 定义棋子类型
-data Disc = Black | White | Empty  -- 添加一个 Empty 选项作为占位符
+data Disc = Black | White | Empty | CursorPos  -- 添加一个 Empty 选项作为占位符
     deriving (Eq, Show)
 
 -- 定义棋盘格
@@ -37,14 +44,22 @@ initBoard =
     in replicate 3 emptyRow ++ [middleRow1, middleRow2] ++ replicate 3 emptyRow
 
 
+data GameState = GameState {
+    _board :: Board, 
+    _cursor :: Int,
+    _turn :: Int,     
+    _start :: Bool
+}
+makeLenses ''GameState
+
 -- 游戏状态
 -- data GameState = GameState { board :: Board }
-data GameState = GameState { board :: Board, currentPlayer :: Disc }
+-- data GameState = GameState { board :: Board, currentPlayer :: Disc }
 
 -- 初始化游戏状态
-initState :: GameState
--- initState = GameState initBoard
-initState = GameState initBoard Black  -- 假设黑方先行
+-- initState :: GameState
+-- -- initState = GameState initBoard
+-- initState = GameState initBoard Black  -- 假设黑方先行
 
 
 -- 渲染游戏界面
@@ -52,19 +67,19 @@ initState = GameState initBoard Black  -- 假设黑方先行
 -- drawUI gs = vBox([str $ boardToStr $ board gs])
 
 -- 将棋盘转换为字符串以显示
-boardToStr :: Board -> String
-boardToStr = concatMap ((++ "\n") . concatMap cellToStr)
-  where
-    cellToStr Empty = ". "
-    cellToStr Black = "O "
-    cellToStr White = "X "
+-- boardToStr :: Board -> String
+-- boardToStr = concatMap ((++ "\n") . concatMap cellToStr)
+--   where
+--     cellToStr Empty = ". "
+--     cellToStr Black = "O "
+--     cellToStr White = "X "
 
 -- 主程序
 -- main :: IO ()
 -- main = M.simpleMain $ drawUI initState
 
-main :: IO ()
-main = runGame initState
+-- main :: IO ()
+-- main = runGame initState
 
 
 
@@ -202,31 +217,10 @@ anyMovesPossible player board = any (\pos -> isPlayablePos player pos board) all
   where
     allPositions = [(x, y) | x <- [0..boardSize - 1], y <- [0..boardSize - 1]]
 
-
-getPlayerMove :: Disc -> Board -> IO (Maybe Position)
-getPlayerMove player board = do
-    let possibleMoves = filter (\pos -> isPlayablePos player pos board) allPositions
-        allPositions = [(x, y) | x <- [0..boardSize - 1], y <- [0..boardSize - 1]]
-
-    if null possibleMoves
-    then do
-        putStrLn $ "Player " ++ show player ++ " has no valid moves."
-        return Nothing
-    else do
-        putStrLn $ "Player " ++ show player ++ ", possible moves: " ++ show possibleMoves
-        putStrLn "Enter your move (e.g., 3 4):"
-        input <- getLine
-        posMaybe <- parseInput input
-        case posMaybe of
-            Just pos -> if isValidMove player pos board
-                        then return $ Just pos
-                        else invalidMove player board
-            Nothing -> invalidMove player board
-
 -- 解析输入为坐标
-parseInput :: String -> IO (Maybe Position)
+parseInput :: String -> EventM n GameState (Maybe Position)
 parseInput input = do
-    putStrLn $ "You entered: " ++ input -- 打印玩家的输入
+    liftIO $ putStrLn $ "You entered: " ++ input -- 打印玩家的输入
     return $ case mapM readMaybe (words input) of
         Just [x, y] -> Just (x, y)
         _ -> Nothing
@@ -236,7 +230,7 @@ isValidMove :: Disc -> Position -> Board -> Bool
 isValidMove player pos board = isValidPos pos board && isPlayablePos player pos board
 
 -- 无效落子处理
-invalidMove :: Disc -> Board -> IO (Maybe Position)
+invalidMove :: Disc -> Board -> EventM n GameState (Maybe Position)
 invalidMove player board = do
-    putStrLn "Invalid move. Please try again."
+    liftIO $ putStrLn "Invalid move. Please try again."
     getPlayerMove player board
