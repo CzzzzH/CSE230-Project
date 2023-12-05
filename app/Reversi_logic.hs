@@ -44,11 +44,13 @@ initBoard =
     in replicate 3 emptyRow ++ [middleRow1, middleRow2] ++ replicate 3 emptyRow
 
 
+type Position = (Int, Int)
 data GameState = GameState {
     _board :: Board, 
     _cursor :: Int,
     _turn :: Int,     
-    _start :: Bool
+    _start :: Bool,
+    _turn_possible_cursor :: [Position]
 }
 makeLenses ''GameState
 
@@ -85,7 +87,6 @@ makeLenses ''GameState
 
 -- 核心逻辑
 
-type Position = (Int, Int)
 -- 检查位置是否有效（在棋盘范围内）
 isValidPos :: Position -> Board -> Bool
 isValidPos (x, y) _ = x >= 0 && y >= 0 && x < boardSize && y < boardSize
@@ -226,11 +227,24 @@ parseInput input = do
         _ -> Nothing
 
 -- 检查落子是否有效
+-- import Debug.Trace
+
 isValidMove :: Disc -> Position -> Board -> Bool
-isValidMove player pos board = isValidPos pos board && isPlayablePos player pos board
+isValidMove player pos board =
+    let validPos = isValidPos pos board
+        playablePos = isPlayablePos player pos board
+    -- in trace ("isValidPos: " ++ show validPos) $
+    --    trace ("isPlayablePos: " ++ show playablePos) $
+    --    validPos && playablePos
+    putStrLn $ validPos ++ ":" ++ playablePos
+    return $ validPos && playablePos
+
+-- isValidMove :: Disc -> Position -> Board -> Bool
+-- isValidMove player pos board = isValidPos pos board && isPlayablePos player pos board
 
 -- 无效落子处理
-invalidMove :: Disc -> Board -> EventM n GameState (Maybe Position)
-invalidMove player board = do
-    liftIO $ putStrLn "Invalid move. Please try again."
-    getPlayerMove player board
+-- invalidMove :: Disc -> EventM n GameState (Int, Int)
+-- invalidMove player = do
+--     liftIO $ putStrLn "Invalid move. Please try again."
+    -- return $ (-1,-1)
+    -- getPlayerMove player board
