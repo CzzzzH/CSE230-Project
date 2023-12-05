@@ -7,6 +7,7 @@ import Text.Read (readMaybe)
 import Control.Monad (forever)
 import Debug.Trace
 import System.Exit (exitSuccess)
+import Data.List (intercalate)
 
 
 -- 定义棋盘大小
@@ -48,13 +49,24 @@ initState = GameState initBoard Black  -- 假设黑方先行
 -- drawUI gs = vBox([str $ boardToStr $ board gs])
 
 -- 将棋盘转换为字符串以显示
+-- boardToStr :: Board -> String
+-- boardToStr = concatMap ((++ "\n") . concatMap cellToStr)
+--   where
+--     cellToStr Empty = ". "
+--     cellToStr Black = "O "
+--     cellToStr White = "X "
 boardToStr :: Board -> String
-boardToStr = concatMap ((++ "\n") . concatMap cellToStr)
-  where
-    cellToStr Empty = ". "
-    cellToStr Black = "O "
-    cellToStr White = "X "
+boardToStr board = 
+    let topBorder = "╔" ++ concat (replicate 7 "═══╦") ++ "═══╗\n"
+        middleBorder = "╠" ++ concat (replicate 7 "═══╬") ++ "═══╣\n"
+        bottomBorder = "╚" ++ concat (replicate 7 "═══╩") ++ "═══╝\n"
+        rowToStr row = "║" ++ intercalate "║" (map cellToStr row) ++ "║\n"
+    in topBorder ++ intercalate middleBorder (map rowToStr board) ++ bottomBorder
 
+cellToStr :: Disc -> String
+cellToStr Empty = "   "
+cellToStr Black = " ○ "
+cellToStr White = " ● "
 -- 主程序
 -- main :: IO ()
 -- main = M.simpleMain $ drawUI initState
