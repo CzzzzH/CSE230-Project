@@ -40,11 +40,10 @@ library
 executable CGA-exe
   main-is: Main.hs
   other-modules:
-      CardGame.CardGameMain
+      CardGame.CardGameUI
       CardGame.Definitions
       CardGame.GameLogic
-      Constant
-      Reversi
+      Draw
       Paths_CGA
   autogen-modules:
       Paths_CGA

@@ -2,7 +2,7 @@
 
 module Main where
 
-import qualified CardGame.CardGameMain as C
+import qualified CardGame.CardGameUI as C
 
 import Brick
 import Brick.BChan
@@ -17,11 +17,13 @@ import Data.List (intersperse)
 import Control.Monad (void, when, unless)
 import Control.Lens
 
-import Constant
+import qualified Draw as D
 
 data AppState = AppState {
     _cursor :: Int,
-    _currentApp :: Int
+    _currentApp :: Int,
+    _canvas :: D.Canvas,
+    _quit :: Bool
 }
 makeLenses ''AppState
 
@@ -30,47 +32,22 @@ app =
     App { appDraw = (:[]) . drawUI
         , appChooseCursor = neverShowCursor
         , appHandleEvent = handleEvent
-        , appAttrMap = const $ attrMap V.defAttr 
-            [ (redAttr, fg V.red)
-            , (greenAttr, fg V.green)
-            , (yellowAttr, fg V.yellow)
-            , (cyanAttr, fg V.cyan `V.withStyle` V.bold)
-            ]
+        , appAttrMap = const $ attrMap V.defAttr D.attrTable
         , appStartEvent = return ()
         }
 
 initialAppState :: AppState
-initialAppState = AppState { _cursor = 0, _currentApp = 0}
+initialAppState = AppState { _cursor = 0, _currentApp = 0, _canvas = drawMenu,  _quit = False}
 
-drawText :: Int -> Int -> String-> [String] -> [String]
-drawText row col text strs = 
-    take row strs ++ [replace $ strs !! row] ++ drop (row + 1) strs
-        where
-            replace oriText = take col oriText ++ text ++ drop (col + length text) oriText
-
-drawMenu :: AppState -> [String]
-drawMenu s = drawText 18 25 "Welcome to Casual Games Arena!"
-    $ drawText 20 25 "You can choose a game to play!"
-    $ drawText 23 15 "╔═════════════╗                   ╔═════════════╗"
-    $ drawText 24 15 "║             ║                   ║             ║"
-    $ drawText 25 15 "║   Othello   ║                   ║  High  Low  ║"
-    $ drawText 26 15 "║             ║                   ║             ║"
-    $ drawText 27 15 "╚═════════════╝                   ╚═════════════╝"
-    $ menu
-
-setColoredStr :: AppState -> Int -> Int -> String -> Widget ()
-setColoredStr s row col rawStr
-    | row < 18 = withAttr redAttr $ str rawStr
-    | row < 21 = withAttr yellowAttr $ str rawStr
-    | col `div` 40 == _cursor s = withAttr cyanAttr $ str rawStr
-    | otherwise = str rawStr
-
-makeWidget :: AppState -> [String] -> Widget ()
-makeWidget s strs = vBox [makeRows i | i <- [0..length strs - 1]]
-    where
-        makeRows i = hBox [makeCols j | j <- [0..length (strs !! i) - 1]]
-            where
-                makeCols j = setColoredStr s i j [strs !! i !! j]
+drawMenu :: D.Canvas
+drawMenu = 
+      D.drawText 18 25 "Welcome to Casual Games Arena!" D.yellowAttr
+    $ D.drawText 20 25 "You can choose a game to play!" D.yellowAttr
+    $ D.drawText 25 19 "Othello"   D.cyanAttr
+    $ D.drawText 25 52 "High  Low" D.whiteAttr
+    $ D.drawBox 23 15 5 15 D.cyanAttr
+    $ D.drawBox 23 49 5 15 D.whiteAttr
+    $ (D.menu, D.menuColorBoard)
 
 drawUI :: AppState -> Widget ()
 drawUI s = center 
@@ -78,12 +55,17 @@ drawUI s = center
     $ hLimit 200
     $ withBorderStyle unicode
     $ border
-    $ makeWidget s
-    $ drawMenu s
+    $ D.makeWidget
+    $ _canvas s
 
 changeCursor :: EventM n AppState ()
 changeCursor = do
     appState <- get
+    canvas %= D.changeColor 23 15 27 63 D.whiteAttr
+    if _cursor appState == 1 then do
+        canvas %= D.changeColor 23 15 27 29 D.cyanAttr
+    else do
+        canvas %= D.changeColor 23 49 27 63 D.cyanAttr
     cursor .= 1 - _cursor appState
 
 startGame :: EventM n AppState ()
@@ -93,18 +75,34 @@ startGame = do
     when (_cursor appState == 1)
         halt
 
+quitApp :: EventM n AppState ()
+quitApp = do
+    currentApp .= -1
+    halt
+
 handleEvent :: BrickEvent n e -> EventM n AppState ()
-handleEvent (VtyEvent (V.EvKey V.KEsc [])) = halt
 handleEvent (VtyEvent (V.EvKey V.KLeft [])) = changeCursor
 handleEvent (VtyEvent (V.EvKey V.KRight [])) = changeCursor
 handleEvent (VtyEvent (V.EvKey V.KEnter [])) = startGame
+handleEvent (VtyEvent (V.EvKey V.KEsc [])) = quitApp
 handleEvent _ = return ()
+
+runMenu :: AppState -> IO ()
+runMenu currentState = do
+    if _currentApp currentState == -1 then do
+        return ()
+    else if _currentApp currentState == 2 then do
+        C.main
+        runMenu currentState {_currentApp = 0}
+    else do 
+        eventChan <- newBChan 10
+        let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
+        initialVty <- buildVty
+        nextState <- customMain initialVty buildVty (Just eventChan) app currentState
+        runMenu nextState
 
 main :: IO ()
 main = do
-    eventChan <- newBChan 10
-    let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
-    initialVty <- buildVty
-    finalState <- customMain initialVty buildVty (Just eventChan) app initialAppState
-    when (_currentApp finalState == 2) $ C.main
+    runMenu initialAppState
+
 
