@@ -9,6 +9,14 @@
 + Chuhao Chen (chc091@ucsd.edu)
 
 
+## Run App/Unit Test
+ 
+```shell
+stack setup
+stack run
+stack test
+```
+
 
 ## Milestone 2: Update
 
@@ -27,7 +35,6 @@ We expect that we can meet our goals until the final deadline.
 
 
 ## Milestone 1: Proposal
-
 We plan to implement a mini game platform in this project, on which players can play a collection of board and card games. Currently we plan to create two games on the platform: **Reversi** and **High Low**, and both of them are two-player games. The platform and the games will be implemented using the  [Brick](https://github.com/jtdaugherty/brick/) library and be run on a TUI.
 
 
@@ -47,10 +54,10 @@ Tips:
 + After each comparison, a new card is randomly drawn from the deck to replenish their hand, keeping it at three cards until there are no more cards in the deck.
 
 
-
 ### Goals
 
 This project consists of the following goals organized as milestones.
+
 #### Step 1
 + Basic setup with starter code (support `stack run` and `stack test`)
 + Basic TUI support including parsing players' action and visualizing the game board
