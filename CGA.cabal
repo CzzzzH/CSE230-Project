@@ -44,6 +44,8 @@ executable CGA-exe
       CardGame.Definitions
       CardGame.GameLogic
       Draw
+      Othello.GameLogic
+      Othello.OthelloUI
       Paths_CGA
   autogen-modules:
       Paths_CGA

@@ -88,6 +88,30 @@ drawWhiteBox x y h w canvas
         drawText x y (replicate w ' ') whiteAttr
       $ drawWhiteBox (x + 1) y (h - 1) w canvas
 
+drawBoard :: Canvas -> Canvas
+drawBoard canvas  = 
+      drawText startX        y "╔═══╦═══╦═══╦═══╦═══╦═══╦═══╦═══╗" whiteAttr
+    $ drawText (startX + 1)  y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 2)  y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 3)  y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 4)  y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 5)  y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 6)  y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 7)  y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 8)  y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 9)  y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 10) y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 11) y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 12) y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 13) y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 14) y "╠═══╬═══╬═══╬═══╬═══╬═══╬═══╬═══╣" whiteAttr
+    $ drawText (startX + 15) y "║   ║   ║   ║   ║   ║   ║   ║   ║" whiteAttr
+    $ drawText (startX + 16) y "╚═══╩═══╩═══╩═══╩═══╩═══╩═══╩═══╝" whiteAttr
+    $ canvas 
+    where
+        startX = 4
+        y = 24
+
 changeColor :: Int -> Int -> Int -> Int -> Color -> Canvas -> Canvas
 changeColor x1 y1 x2 y2 color (strs, cb)
     | x1 > x2 || y1 > y2 = (strs, cb) 

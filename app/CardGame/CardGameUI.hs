@@ -54,44 +54,6 @@ app =
         , appStartEvent = return ()
         }
 
-runGame :: EventM n AppState ()
-runGame = do
-    appState <- get
-    if _gameOver appState then do
-        return ()
-    else do 
-        if _turn appState == 1 then do
-            let playerA = _player1 appState
-            let cardA = hand playerA !! _cursor appState
-            let newHandA = delete cardA (hand playerA)
-            player1 .= playerA { hand = newHandA, chosenCard = [cardA] }
-            turn .= 2
-            cursor .= 0
-            updateCanvas
-        else do
-            let playerA = _player1 appState
-            let playerB = _player2 appState
-            let cardA = head $ chosenCard playerA
-            let cardB = hand playerB !! _cursor appState
-            let newHandB = delete cardB (hand playerB)
-            let (win1, win2) = compareCards cardA cardB
-            let (newPlayerA, newPlayerB) = updateState playerA playerB { hand = newHandB, chosenCard = [cardB] }
-                                                    cardA cardB win1 win2
-
-            if win1 then do winner .= 1
-            else if win2 then do winner .= 2
-            else do winner .= 0
-
-            player1 .= getCard newPlayerA
-            player2 .= getCard newPlayerB
-            gameRound .= _gameRound appState + 1
-            turn .= 1
-            cursor .= 0
-            if null (hand $ _player1 appState) && null (deck $ _player1 appState) then do gameOver .= True
-            else do return ()
-            updateCanvas
-            winner .= -1
-
 drawCard :: Card -> String
 drawCard card = 
     case card of
@@ -226,6 +188,44 @@ changeCursor offset = do
         let currentPlayer = if _turn appState == 1 then _player1 appState else _player2 appState
         cursor .= (_cursor appState + offset) `mod` (length $ hand currentPlayer)
         updateCanvas
+
+runGame :: EventM n AppState ()
+runGame = do
+    appState <- get
+    if _gameOver appState then do
+        return ()
+    else do 
+        if _turn appState == 1 then do
+            let playerA = _player1 appState
+            let cardA = hand playerA !! _cursor appState
+            let newHandA = delete cardA (hand playerA)
+            player1 .= playerA { hand = newHandA, chosenCard = [cardA] }
+            turn .= 2
+            cursor .= 0
+            updateCanvas
+        else do
+            let playerA = _player1 appState
+            let playerB = _player2 appState
+            let cardA = head $ chosenCard playerA
+            let cardB = hand playerB !! _cursor appState
+            let newHandB = delete cardB (hand playerB)
+            let (win1, win2) = compareCards cardA cardB
+            let (newPlayerA, newPlayerB) = updateState playerA playerB { hand = newHandB, chosenCard = [cardB] }
+                                                    cardA cardB win1 win2
+
+            if win1 then do winner .= 1
+            else if win2 then do winner .= 2
+            else do winner .= 0
+
+            player1 .= getCard newPlayerA
+            player2 .= getCard newPlayerB
+            gameRound .= _gameRound appState + 1
+            turn .= 1
+            cursor .= 0
+            if null (hand $ _player1 appState) && null (deck $ _player1 appState) then do gameOver .= True
+            else do return ()
+            updateCanvas
+            winner .= -1
 
 endGame :: EventM n AppState ()
 endGame = do

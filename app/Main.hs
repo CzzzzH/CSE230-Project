@@ -3,8 +3,21 @@
 module Main where
 
 import qualified CardGame.CardGameUI as C
+import qualified Othello.OthelloUI as O
 
 import Brick
+    ( App(..),
+      EventM,
+      Widget,
+      BrickEvent(VtyEvent),
+      get,
+      neverShowCursor,
+      attrMap,
+      vLimit,
+      hLimit,
+      withBorderStyle,
+      halt,
+      customMain )
 import Brick.BChan
 import Brick.Widgets.Center
 import Brick.Widgets.Border
@@ -72,8 +85,7 @@ startGame :: EventM n AppState ()
 startGame = do
     appState <- get
     currentApp .= _cursor appState + 1
-    when (_cursor appState == 1)
-        halt
+    halt
 
 quitApp :: EventM n AppState ()
 quitApp = do
@@ -91,6 +103,9 @@ runMenu :: AppState -> IO ()
 runMenu currentState = do
     if _currentApp currentState == -1 then do
         return ()
+    else if _currentApp currentState == 1 then do
+        O.main
+        runMenu currentState {_currentApp = 0}
     else if _currentApp currentState == 2 then do
         C.main
         runMenu currentState {_currentApp = 0}

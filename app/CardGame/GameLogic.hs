@@ -1,7 +1,6 @@
 module CardGame.GameLogic where
 
 import CardGame.Definitions ( Player(..), Card, fullDeck )
-import Text.Read (readMaybe)
 import System.Random (newStdGen, randomR, StdGen)
 import Data.List ( (\\), delete )
 
