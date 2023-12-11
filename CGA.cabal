@@ -56,8 +56,10 @@ executable CGA-exe
       CGA
     , base >=4.7 && <5
     , brick
+    , bytestring
     , containers
     , lens
+    , network
     , random
     , vty
     , vty-crossplatform

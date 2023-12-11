@@ -30,6 +30,12 @@ import Data.List (intersperse)
 import Control.Monad (void, when, unless)
 import Control.Lens
 
+import Network.Socket
+import Network.Socket.ByteString (send, recv)
+import Control.Concurrent (forkIO)
+import Control.Exception (bracket)
+import Data.ByteString.Char8 as BS (pack, unpack)
+
 import qualified Draw as D
 
 data AppState = AppState {
@@ -115,6 +121,47 @@ runMenu currentState = do
         initialVty <- buildVty
         nextState <- customMain initialVty buildVty (Just eventChan) app currentState
         runMenu nextState
+
+startServer :: IO ()
+startServer = withSocketsDo $ do
+    addr <- resolve "127.0.0.1" "8080"
+    sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
+    bind sock (addrAddress addr)
+    listen sock 5
+    putStrLn "Server listening on port 8080"
+
+    -- only serve one connection
+    (conn, clientAddr) <- accept sock
+    putStrLn $ "Established connection with " ++ show clientAddr
+    handleClient conn
+
+resolve :: String -> String -> IO AddrInfo
+resolve host port = do
+    let hints = defaultHints { addrSocketType = Stream }
+    addr:_ <- getAddrInfo (Just hints) (Just host) (Just port)
+    return addr
+
+handleClient :: Socket -> IO ()
+handleClient conn = do
+    msg <- recv conn 4096
+    putStrLn $ "Received from client: " ++ (unpack msg)
+    send conn (pack "Hello, client!\n")
+    return ()
+
+startClient :: IO ()
+startClient = do
+    putStrLn "Please input Server IP address:"
+    host <- getLine
+    putStrLn "Please input Server port number:"
+    port <- getLine
+
+    addr <- resolve host port
+    conn <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
+    connect conn (addrAddress addr)  
+
+    send conn (pack "Hello, server!\n")
+    msg <- recv conn 4096
+    putStrLn $ "Received from server: " ++ unpack msg
 
 main :: IO ()
 main = do
