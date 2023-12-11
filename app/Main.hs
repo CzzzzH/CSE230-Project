@@ -55,8 +55,6 @@ app =
         , appStartEvent = return ()
         }
 
-initialAppState :: AppState
-initialAppState = AppState { _cursor = 0, _currentApp = 0, _canvas = drawMenu,  _quit = False}
 
 drawMenu :: D.Canvas
 drawMenu = 
@@ -105,22 +103,23 @@ handleEvent (VtyEvent (V.EvKey V.KEnter [])) = startGame
 handleEvent (VtyEvent (V.EvKey V.KEsc [])) = quitApp
 handleEvent _ = return ()
 
-runMenu :: AppState -> IO ()
-runMenu currentState = do
+runMenu :: Socket -> AppState -> IO ()
+runMenu conn currentState = do
     if _currentApp currentState == -1 then do
         return ()
     else if _currentApp currentState == 1 then do
+        send conn (pack "1")
         O.main
-        runMenu currentState {_currentApp = 0}
+        runMenu conn currentState {_currentApp = 0}
     else if _currentApp currentState == 2 then do
         C.main
-        runMenu currentState {_currentApp = 0}
+        runMenu conn currentState {_currentApp = 0}
     else do 
         eventChan <- newBChan 10
         let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
         initialVty <- buildVty
         nextState <- customMain initialVty buildVty (Just eventChan) app currentState
-        runMenu nextState
+        runMenu conn nextState
 
 startServer :: IO ()
 startServer = withSocketsDo $ do
@@ -143,10 +142,18 @@ resolve host port = do
 
 handleClient :: Socket -> IO ()
 handleClient conn = do
-    msg <- recv conn 4096
-    putStrLn $ "Received from client: " ++ (unpack msg)
-    send conn (pack "Hello, client!\n")
-    return ()
+    -- recv the gameID
+    chaosMsg <- recv conn 4096
+    let msg = unpack chaosMsg
+    if msg /= "1" && msg /= "2"
+        then do
+            -- putStrLn $ "Received unexpected message from client: " ++ msg 
+            handleClient conn 
+        else do
+            let gameID = read msg
+            putStrLn $ "Client chose" ++ if gameID == 1 then "Othello" else "Card Game"
+            let initialAppState = AppState { _cursor = 0, _currentApp = gameID, _canvas = drawMenu,  _quit = False}
+            runMenu conn initialAppState
 
 startClient :: IO ()
 startClient = do
@@ -159,12 +166,17 @@ startClient = do
     conn <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
     connect conn (addrAddress addr)  
 
-    send conn (pack "Hello, server!\n")
-    msg <- recv conn 4096
-    putStrLn $ "Received from server: " ++ unpack msg
+    let initialAppState = AppState { _cursor = 0, _currentApp = 0, _canvas = drawMenu,  _quit = False}
+    runMenu conn initialAppState
 
 main :: IO ()
 main = do
-    runMenu initialAppState
-
-
+    putStrLn "Choose mode: (1) Server, (2) Client"
+    mode <- getLine
+    case mode of
+        "1" -> startServer
+        "2" -> startClient
+        _  -> do { 
+            putStrLn "Invalid mode. Please choose again: (1) Server, (2) Client";
+            main
+        }
