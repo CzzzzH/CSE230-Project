@@ -108,8 +108,9 @@ runMenu conn currentState isServer = do
         return ()
     else if _currentApp currentState == 1 then do
         send conn (pack "1")
-        O.main isServer conn
-        runMenu conn currentState {_currentApp = 0} isServer
+        errorCode <- O.main isServer conn
+        if errorCode == -1 then do return () else do
+            runMenu conn currentState {_currentApp = 0} isServer
     else if _currentApp currentState == 2 then do
         C.main
         runMenu conn currentState {_currentApp = 0} isServer
@@ -150,11 +151,10 @@ handleClient conn = do
     let msg = unpack chaosMsg
     if msg /= "1" && msg /= "2"
         then do
-            putStrLn $ "Received unexpected message from client: " ++ msg 
             handleClient conn 
         else do
             let gameID = read msg
-            putStrLn $ "Client chose" ++ if gameID == 1 then "Othello" else "Card Game"
+            -- putStrLn $ "Client chose " ++ if gameID == 1 then "Othello" else "Card Game"
             let initialAppState = AppState { _cursor = 0, _currentApp = gameID, _canvas = drawMenu,  _quit = False}
             runMenu conn initialAppState True
 

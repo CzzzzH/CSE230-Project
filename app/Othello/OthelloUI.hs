@@ -36,7 +36,8 @@ data AppState = AppState {
     _restart :: Bool,
     _canvas :: D.Canvas,
     _iAm :: Disc,
-    _conn :: Socket
+    _conn :: Socket,
+    _exit :: Bool
 }
 makeLenses ''AppState
 
@@ -51,10 +52,11 @@ genInitAppState isServer conn = do
                       _restart = False,
                       _canvas = drawGame,
                       _iAm = if isServer then White else Black,
-                      _conn = conn
+                      _conn = conn,
+                      _exit = False
                     }
 
-data MyEvent = SocketEvent (Int, Int)
+data MyEvent = SocketEvent (Int, Int) | RestartEvent | ExitEvent | NoMovesEvent
 
 app :: App AppState MyEvent ()
 app =
@@ -125,6 +127,8 @@ updateCanvas = do
         canvas %= drawDiscs (board $ _gameState appState) 0
         canvas %= D.drawText 28 3 "Game Over!" D.yellowAttr
         canvas %= D.drawText 28 15 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
+        canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
+        canvas %= D.drawText 24 3 (replicate 70 ' ') D.yellowAttr
     else if p /= _iAm appState then do
         let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
@@ -178,6 +182,9 @@ runGame (x, y) newPlayer = do
     case checkGameOver newBoard of
         Just (gameWinner, _) -> do
             gameOver .= True
+
+            -- TODO gameOver handling
+
             if gameWinner == Just Black then winner .= 1
             else if gameWinner == Just White then winner .= 2
             else winner .= 0
@@ -185,26 +192,31 @@ runGame (x, y) newPlayer = do
             return ()
     updateCanvas
 
+kRESTART, kEXIT, kNO_MOVES :: String
+kRESTART = "RESTART"
+kEXIT = "EXIT"
+kNO_MOVES = "NO_MOVES"
+
 runSelfGame :: EventM n AppState ()
 runSelfGame = do
     appState <- get
     let state = _gameState appState
-    let cp = currentPlayer state
-    let newPlayer = if cp == Black then White else Black
+    let oppo = currentPlayer state
     
-    -- not my turn; 考虑在界面提示用户
-    if cp == _iAm appState then do
+    if oppo == _iAm appState then do
         return ()
     else if _gameOver appState then do
         return ()
     else if _noMove appState then do
+        let newPlayer = _iAm appState
         let newGameState = state { currentPlayer = newPlayer }
         gameState .= newGameState
-        if anyMovesPossible newPlayer (board state) then do
+
+        -- tell the other side
+        liftIO $ do {
+            _ <- send (_conn appState) (pack (show kNO_MOVES));
             return ()
-        else do
-            winner .= 0
-            gameOver .= True
+        }
         updateCanvas
     else do
         let idxPair = _choice appState
@@ -217,18 +229,51 @@ runSelfGame = do
 
 runOppoGame :: (Int, Int) -> EventM n AppState ()
 runOppoGame idxPair = do
-    state <- get
-    let oppo = if (_iAm state) == White then Black else White
+    appState <- get
+    let oppo = if (_iAm appState) == White then Black else White
     runGame idxPair oppo
 
 endGame :: EventM n AppState ()
 endGame = do
+    exit .= True
+    appState <- get
+    liftIO $ do {
+        _ <- send (_conn appState) (pack (show kEXIT));
+        return ()
+    }
+    halt
+
+oppoExit :: EventM n AppState ()
+oppoExit = do
+    exit .= True
     halt
 
 restartGame :: EventM n AppState ()
 restartGame = do
+    appState <- get
+    liftIO $ do {
+        _ <- send (_conn appState) (pack (show kRESTART));
+        return ()
+    }
     restart .= True
     halt
+
+oppoRestart :: EventM n AppState ()
+oppoRestart = do
+    restart .= True
+    -- to trigger updateCanvas
+    changeCursor 0
+    halt
+
+oppoNoMove :: EventM n AppState ()
+oppoNoMove = do
+    appState <- get
+    let state = _gameState appState
+    let cp = currentPlayer state
+    let oppo = if cp == Black then White else Black
+    let newGameState = state { currentPlayer = oppo }
+    gameState .= newGameState
+    updateCanvas
 
 handleEvent :: BrickEvent n MyEvent -> EventM n AppState ()
 handleEvent (VtyEvent (V.EvKey V.KLeft [])) = changeCursor (-1)
@@ -240,6 +285,9 @@ handleEvent (VtyEvent (V.EvKey V.KEsc [])) = endGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'R') [])) = restartGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'r') [])) = restartGame
 handleEvent (AppEvent (SocketEvent idxPair)) = runOppoGame idxPair
+handleEvent (AppEvent (RestartEvent)) = oppoRestart
+handleEvent (AppEvent (ExitEvent)) = oppoExit
+handleEvent (AppEvent (NoMovesEvent)) = oppoNoMove
 handleEvent _ = return ()
 
 pairParser :: Parser (Int, Int) 
@@ -262,13 +310,19 @@ runNetwork conn eventChan = do
   forever $ do
     chaosMsg <- recv conn 1024
     let msg = unpack chaosMsg
-    if msg /= "" then do
+    if msg == show kRESTART then do
+        writeBChan eventChan (RestartEvent)
+    else if msg == show kEXIT then do
+        writeBChan eventChan (ExitEvent)
+    else if msg == show kNO_MOVES then do
+        writeBChan eventChan (NoMovesEvent)
+    else if msg /= "" then do
         case P.parse pairParser "" msg of
             Left _        -> return ()
             Right idxPair -> writeBChan eventChan (SocketEvent idxPair)
     else return ()
 
-main :: Bool -> Socket -> IO ()
+main :: Bool -> Socket -> IO Int
 main isServer conn = do
     eventChan <- newBChan 10
     forkIO $ runNetwork conn eventChan
@@ -278,5 +332,7 @@ main isServer conn = do
     nextState <- customMain initialVty buildVty (Just eventChan) app initAppState
     if _restart nextState then do
         main isServer conn
+    else if _exit nextState then do
+        return (-1)
     else do
-        return ()
+        return 0
