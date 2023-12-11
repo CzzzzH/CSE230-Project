@@ -16,6 +16,16 @@ import Control.Lens
 
 import qualified Draw as D
 
+import Network.Socket
+import Network.Socket.ByteString (send, recv)
+import Control.Concurrent (forkIO)
+import Control.Exception (bracket)
+import Data.ByteString.Char8 as BS (pack, unpack)
+import qualified Text.Parsec as P
+import Text.Parsec.String (Parser)
+import Control.Monad (forever)
+import Control.Monad.IO.Class (liftIO)
+
 data AppState = AppState {
     _gameState :: GameState,
     _choice :: Position,
@@ -24,12 +34,14 @@ data AppState = AppState {
     _noMove :: Bool,
     _gameOver :: Bool,
     _restart :: Bool,
-    _canvas :: D.Canvas
+    _canvas :: D.Canvas,
+    _iAm :: Disc,
+    _conn :: Socket
 }
 makeLenses ''AppState
 
-genInitAppState :: IO AppState
-genInitAppState = do
+genInitAppState :: Bool -> Socket -> IO AppState
+genInitAppState isServer conn = do
     return AppState { _gameState = initState,
                       _choice = (-1, -1),
                       _cursor = -1, 
@@ -37,9 +49,14 @@ genInitAppState = do
                       _noMove = False,
                       _gameOver = False, 
                       _restart = False,
-                      _canvas = drawGame}
+                      _canvas = drawGame,
+                      _iAm = if isServer then White else Black,
+                      _conn = conn
+                    }
 
-app :: App AppState e ()
+data MyEvent = SocketEvent (Int, Int)
+
+app :: App AppState MyEvent ()
 app =
     App { appDraw = (:[]) . drawUI
         , appChooseCursor = neverShowCursor
@@ -140,13 +157,35 @@ changeCursor offset = do
     updateCanvas
     return ()
 
-runGame :: EventM n AppState ()
-runGame = do
+runGame :: (Int, Int) -> Disc -> EventM n AppState ()
+runGame (x, y) newPlayer = do
+    appState <- get
+    let state = _gameState appState
+    let cp = if newPlayer == Black then White else Black
+    let newBoard = flipDiscs cp (x, y) (board state)
+    let newGameState = state { board = newBoard, currentPlayer = newPlayer }
+    gameState .= newGameState
+    case checkGameOver newBoard of
+        Just (gameWinner, _) -> do
+            gameOver .= True
+            if gameWinner == Just Black then winner .= 1
+            else if gameWinner == Just White then winner .= 2
+            else winner .= 0
+        Nothing -> do
+            return ()
+    updateCanvas
+
+runSelfGame :: EventM n AppState ()
+runSelfGame = do
     appState <- get
     let state = _gameState appState
     let cp = currentPlayer state
     let newPlayer = if cp == Black then White else Black
-    if _gameOver appState then do
+    
+    -- not my turn; 考虑在界面提示用户
+    if cp == _iAm appState then do
+        return ()
+    else if _gameOver appState then do
         return ()
     else if _noMove appState then do
         let newGameState = state { currentPlayer = newPlayer }
@@ -158,19 +197,19 @@ runGame = do
             gameOver .= True
         updateCanvas
     else do
-        let (x, y) = _choice appState
-        let newBoard = flipDiscs cp (x, y) (board state)
-        let newGameState = state { board = newBoard, currentPlayer = newPlayer }
-        gameState .= newGameState
-        case checkGameOver newBoard of
-            Just (gameWinner, _) -> do
-                gameOver .= True
-                if gameWinner == Just Black then winner .= 1
-                else if gameWinner == Just White then winner .= 2
-                else winner .= 0
-            Nothing -> do
-                return ()
-        updateCanvas
+        let idxPair = _choice appState
+        runGame idxPair (_iAm appState)
+        -- tell the other side about your move
+        liftIO $ do {
+            _ <- send (_conn appState) (pack (show idxPair));
+            return ()
+        }
+
+runOppoGame :: (Int, Int) -> EventM n AppState ()
+runOppoGame idxPair = do
+    state <- get
+    let oppo = if (_iAm state) == White then Black else White
+    runGame idxPair oppo
 
 endGame :: EventM n AppState ()
 endGame = do
@@ -181,25 +220,53 @@ restartGame = do
     restart .= True
     halt
 
-handleEvent :: BrickEvent n e -> EventM n AppState ()
+handleEvent :: BrickEvent n MyEvent -> EventM n AppState ()
 handleEvent (VtyEvent (V.EvKey V.KLeft [])) = changeCursor (-1)
 handleEvent (VtyEvent (V.EvKey V.KRight [])) = changeCursor 1
 handleEvent (VtyEvent (V.EvKey V.KUp [])) = changeCursor (-6)
 handleEvent (VtyEvent (V.EvKey V.KDown [])) = changeCursor 6
-handleEvent (VtyEvent (V.EvKey V.KEnter [])) = runGame
+handleEvent (VtyEvent (V.EvKey V.KEnter [])) = runSelfGame
 handleEvent (VtyEvent (V.EvKey V.KEsc [])) = endGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'R') [])) = restartGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'r') [])) = restartGame
+handleEvent (AppEvent (SocketEvent idxPair)) = runOppoGame idxPair
 handleEvent _ = return ()
 
-main :: IO ()
-main = do
+pairParser :: Parser (Int, Int) 
+pairParser = do
+  P.char '('
+  x <- intParser
+  P.spaces
+  P.char ','
+  P.spaces
+  y <- intParser
+  P.char ')'
+  return (x, y)
+
+intParser :: Parser Int
+intParser = read <$> P.many1 P.digit
+
+runNetwork :: Socket -> BChan MyEvent -> IO ()
+runNetwork conn eventChan = do
+  -- Read from the socket, parse messages, and send events to the UI
+  forever $ do
+    chaosMsg <- recv conn 1024
+    let msg = unpack chaosMsg
+    if msg /= "" then do
+        case P.parse pairParser "" msg of
+            Left _        -> return ()
+            Right idxPair -> writeBChan eventChan (SocketEvent idxPair)
+    else return ()
+
+main :: Bool -> Socket -> IO ()
+main isServer conn = do
     eventChan <- newBChan 10
+    forkIO $ runNetwork conn eventChan
     let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
     initialVty <- buildVty
-    initAppState <- genInitAppState
+    initAppState <- genInitAppState isServer conn
     nextState <- customMain initialVty buildVty (Just eventChan) app initAppState
     if _restart nextState then do
-        main
+        main isServer conn
     else do
         return ()

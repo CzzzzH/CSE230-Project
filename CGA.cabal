@@ -60,6 +60,7 @@ executable CGA-exe
     , containers
     , lens
     , network
+    , parsec
     , random
     , vty
     , vty-crossplatform

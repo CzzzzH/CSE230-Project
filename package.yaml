@@ -54,6 +54,7 @@ executables:
     - random
     - network
     - bytestring
+    - parsec
 
 tests:
   CGA-test:

@@ -55,7 +55,6 @@ app =
         , appStartEvent = return ()
         }
 
-
 drawMenu :: D.Canvas
 drawMenu = 
       D.drawText 18 25 "Welcome to Casual Games Arena!" D.yellowAttr
@@ -103,23 +102,23 @@ handleEvent (VtyEvent (V.EvKey V.KEnter [])) = startGame
 handleEvent (VtyEvent (V.EvKey V.KEsc [])) = quitApp
 handleEvent _ = return ()
 
-runMenu :: Socket -> AppState -> IO ()
-runMenu conn currentState = do
+runMenu :: Socket -> AppState -> Bool -> IO ()
+runMenu conn currentState isServer = do
     if _currentApp currentState == -1 then do
         return ()
     else if _currentApp currentState == 1 then do
         send conn (pack "1")
-        O.main
-        runMenu conn currentState {_currentApp = 0}
+        O.main isServer conn
+        runMenu conn currentState {_currentApp = 0} isServer
     else if _currentApp currentState == 2 then do
         C.main
-        runMenu conn currentState {_currentApp = 0}
+        runMenu conn currentState {_currentApp = 0} isServer
     else do 
         eventChan <- newBChan 10
         let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
         initialVty <- buildVty
         nextState <- customMain initialVty buildVty (Just eventChan) app currentState
-        runMenu conn nextState
+        runMenu conn nextState isServer
 
 startServer :: IO ()
 startServer = withSocketsDo $ do
@@ -147,13 +146,13 @@ handleClient conn = do
     let msg = unpack chaosMsg
     if msg /= "1" && msg /= "2"
         then do
-            -- putStrLn $ "Received unexpected message from client: " ++ msg 
+            putStrLn $ "Received unexpected message from client: " ++ msg 
             handleClient conn 
         else do
             let gameID = read msg
             putStrLn $ "Client chose" ++ if gameID == 1 then "Othello" else "Card Game"
             let initialAppState = AppState { _cursor = 0, _currentApp = gameID, _canvas = drawMenu,  _quit = False}
-            runMenu conn initialAppState
+            runMenu conn initialAppState True
 
 startClient :: IO ()
 startClient = do
@@ -167,7 +166,7 @@ startClient = do
     connect conn (addrAddress addr)  
 
     let initialAppState = AppState { _cursor = 0, _currentApp = 0, _canvas = drawMenu,  _quit = False}
-    runMenu conn initialAppState
+    runMenu conn initialAppState False
 
 main :: IO ()
 main = do
