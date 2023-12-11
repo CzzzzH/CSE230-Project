@@ -69,7 +69,6 @@ drawGame :: D.Canvas
 drawGame =
       D.drawText 1 3  "Game: Othello" D.yellowAttr
     $ D.drawText 2 3  "Hint: [Enter] Choose a move [R] Restart [Esc] Quit the game" D.yellowAttr
-    $ D.drawText 28 3 "Select a move from above options!" D.yellowAttr
     $ D.drawBoard
     $ (D.whiteBoard, D.whiteColorBoard)
     
@@ -126,7 +125,7 @@ updateCanvas = do
         canvas %= drawDiscs (board $ _gameState appState) 0
         canvas %= D.drawText 28 3 "Game Over!" D.yellowAttr
         canvas %= D.drawText 28 15 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
-    else do
+    else if p /= _iAm appState then do
         let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Valid moves:") D.yellowAttr
@@ -149,6 +148,17 @@ updateCanvas = do
             canvas %= drawDiscs (board $ _gameState appState) 0
             canvas %= drawOptions possibles 0 newCursor p
             noMove .= False
+            canvas %= D.drawText 28 3 "Select a move from above options!" D.yellowAttr
+
+    else do
+        canvas %= D.drawWhiteBox 24 3 4 75 
+        canvas %= D.drawBoard
+        canvas %= drawDiscs (board $ _gameState appState) 0
+        -- canvas %= drawOptions possibles 0 newCursor p
+        canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
+        canvas %= D.drawText 22 3 ("Waiting for opponent input...") D.yellowAttr
+        canvas %= D.drawText 28 3 (replicate 70 ' ') D.yellowAttr
+
 
 changeCursor :: Int -> EventM n AppState ()
 changeCursor offset = do

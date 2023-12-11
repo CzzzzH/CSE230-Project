@@ -120,13 +120,17 @@ runMenu conn currentState isServer = do
         nextState <- customMain initialVty buildVty (Just eventChan) app currentState
         runMenu conn nextState isServer
 
+myDefaultHost, myDefaultPort :: String
+myDefaultHost = "127.0.0.1"
+myDefaultPort = "8080"
+
 startServer :: IO ()
 startServer = withSocketsDo $ do
-    addr <- resolve "127.0.0.1" "8080"
+    addr <- resolve myDefaultHost myDefaultPort
     sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
     bind sock (addrAddress addr)
     listen sock 5
-    putStrLn "Server listening on port 8080"
+    putStrLn $ "Server listening on port " ++ myDefaultPort
 
     -- only serve one connection
     (conn, clientAddr) <- accept sock
@@ -156,10 +160,13 @@ handleClient conn = do
 
 startClient :: IO ()
 startClient = do
-    putStrLn "Please input Server IP address:"
-    host <- getLine
-    putStrLn "Please input Server port number:"
-    port <- getLine
+    putStrLn "Please input Server IP address: Press [ENTER] to use default config."
+    hostOrNull <- getLine
+    putStrLn "Please input Server port number: Press [ENTER] to use default config."
+    portOrNull <- getLine
+
+    let host = if hostOrNull == "" then myDefaultHost else hostOrNull
+    let port = if portOrNull == "" then myDefaultPort else portOrNull
 
     addr <- resolve host port
     conn <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
