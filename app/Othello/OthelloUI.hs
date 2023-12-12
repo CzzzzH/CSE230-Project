@@ -134,7 +134,7 @@ updateCanvas = do
         canvas %= D.drawText 28 15 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 24 3 (replicate 70 ' ') D.yellowAttr
-    else if p /= _iAm appState || _single appState || _noMove appState then do
+    else if p == _iAm appState ||  _single appState  then do
         let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Valid moves:") D.yellowAttr
@@ -203,13 +203,13 @@ runSelfGame :: EventM n AppState ()
 runSelfGame = do
     appState <- get
     let state = _gameState appState
-    let oppo = currentPlayer state
-    let newPlayer = if oppo == Black then White else Black
+    let cp = currentPlayer state
+    let newPlayer = if cp == Black then White else Black
     let notSingle = not (_single appState)
 
     if _gameOver appState then do
         return ()
-    else if notSingle && oppo == _iAm appState then do
+    else if notSingle && cp /= _iAm appState then do
         return ()
     else if _noMove appState then do
         
@@ -237,8 +237,7 @@ runSelfGame = do
 runOppoGame :: (Int, Int) -> EventM n AppState ()
 runOppoGame idxPair = do
     appState <- get
-    let oppo = if _iAm appState == White then Black else White
-    runGame idxPair oppo
+    runGame idxPair $ _iAm appState
 
 oppoNoMove :: EventM n AppState ()
 oppoNoMove = do

@@ -40,7 +40,7 @@ data GameState = GameState { board :: Board, currentPlayer :: Disc }
 -- 初始化游戏状态
 initState :: GameState
 -- initState = GameState initBoard
-initState = GameState initBoard Black  -- 假设黑方先行，则初始化为白，即上一轮结束的是白
+initState = GameState initBoard Black  -- 黑方先行，初始化为黑方
 
 -- 核心逻辑
 

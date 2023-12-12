@@ -70,6 +70,7 @@ test-suite CGA-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      CardTest
       Paths_CGA
   autogen-modules:
       Paths_CGA
@@ -78,5 +79,7 @@ test-suite CGA-test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       CGA
+    , QuickCheck
     , base >=4.7 && <5
+    , random
   default-language: Haskell2010
