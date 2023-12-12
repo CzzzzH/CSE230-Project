@@ -23,7 +23,7 @@ import Control.Exception (bracket)
 import Data.ByteString.Char8 as BS (pack, unpack)
 import qualified Text.Parsec as P
 import Text.Parsec.String (Parser)
-import Control.Monad (forever)
+import Control.Monad (forever, unless, when)
 import Control.Monad.IO.Class (liftIO)
 
 data AppState = AppState {
@@ -36,23 +36,25 @@ data AppState = AppState {
     _restart :: Bool,
     _canvas :: D.Canvas,
     _iAm :: Disc,
-    _conn :: Socket,
+    _single :: Bool,
+    _appConnect :: Socket,
     _exit :: Bool
 }
 makeLenses ''AppState
 
-genInitAppState :: Bool -> Socket -> IO AppState
-genInitAppState isServer conn = do
+genInitAppState :: Bool -> Bool -> Socket -> IO AppState
+genInitAppState isSingle isServer conn = do
     return AppState { _gameState = initState,
                       _choice = (-1, -1),
-                      _cursor = -1, 
-                      _winner = -1, 
+                      _cursor = 0,
+                      _winner = -1,
                       _noMove = False,
-                      _gameOver = False, 
+                      _gameOver = False,
                       _restart = False,
                       _canvas = drawGame,
-                      _iAm = if isServer then White else Black,
-                      _conn = conn,
+                      _iAm = if isServer then Black else White,
+                      _single = isSingle,
+                      _appConnect = conn,
                       _exit = False
                     }
 
@@ -73,7 +75,7 @@ drawGame =
     $ D.drawText 2 3  "Hint: [Enter] Choose a move [R] Restart [Esc] Quit the game" D.yellowAttr
     $ D.drawBoard
     $ (D.whiteBoard, D.whiteColorBoard)
-    
+
 drawUI :: AppState -> Widget ()
 drawUI s = center
     $ vLimit 200
@@ -85,7 +87,7 @@ drawUI s = center
 
 drawOptions :: [Position] -> Int -> Int -> Disc -> D.Canvas -> D.Canvas
 drawOptions [] _ _ _ c = c
-drawOptions (p:ps) idx currentCursor player c = 
+drawOptions (p:ps) idx currentCursor player c =
     let
         x = 24 + idx `div` 6
         y = 3 + 13 * (idx `mod` 6)
@@ -99,9 +101,9 @@ drawOptions (p:ps) idx currentCursor player c =
         D.drawText x y ("[" ++ show p ++ "]") color
       $ D.drawText xBoard yBoard cell colorBoard
       $ drawOptions ps (idx + 1) currentCursor player c
- 
+
 drawDiscs :: Board -> Int -> D.Canvas -> D.Canvas
-drawDiscs b idx c 
+drawDiscs b idx c
     | idx >= boardSize * boardSize = c
     | otherwise =
         let
@@ -121,46 +123,50 @@ updateCanvas = do
     let p = currentPlayer $ _gameState appState
     let b = board $ _gameState appState
     if _gameOver appState then do
-        let winnerStr = if _winner appState == 1 then "Black win  " else if _winner appState == 2 then "White win  " else "Draw  "
-        canvas %= D.drawWhiteBox 24 3 6 75 
+        let winnerStr 
+              |  _winner appState == 1 = "Black win  " 
+              |  _winner appState == 2 = "White win  "
+              |  otherwise = "Draw  "
+        canvas %= D.drawWhiteBox 24 3 6 75
         canvas %= D.drawBoard
         canvas %= drawDiscs (board $ _gameState appState) 0
         canvas %= D.drawText 28 3 "Game Over!" D.yellowAttr
         canvas %= D.drawText 28 15 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 24 3 (replicate 70 ' ') D.yellowAttr
-    else if p /= _iAm appState then do
+    else if p /= _iAm appState || _single appState || _noMove appState then do
         let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Valid moves:") D.yellowAttr
-        
+
         let allPositions = [(x, y) | x <- [0..boardSize - 1], y <- [0..boardSize - 1]]
         let possibles = filter (\pos -> isPlayablePos p pos b) allPositions
         if null possibles
         then do
             cursor .= 0
             choice .= (-1, -1)
-            canvas %= D.drawText 24 3 (replicate 70 ' ') D.yellowAttr
+            canvas %= D.drawWhiteBox 24 3 4 75
+            canvas %= D.drawBoard
+            canvas %= drawDiscs (board $ _gameState appState) 0
             canvas %= D.drawText 24 3 "No valid moves! Press [Enter] to skip your move" D.yellowAttr
             noMove .= True
         else do
             let newCursor = _cursor appState `mod` (length $ possibles)
             choice .= (possibles !! newCursor)
             cursor .= newCursor
-            canvas %= D.drawWhiteBox 24 3 4 75 
+            canvas %= D.drawWhiteBox 24 3 4 75
             canvas %= D.drawBoard
             canvas %= drawDiscs (board $ _gameState appState) 0
             canvas %= drawOptions possibles 0 newCursor p
             noMove .= False
             canvas %= D.drawText 28 3 "Select a move from above options!" D.yellowAttr
-
     else do
-        canvas %= D.drawWhiteBox 24 3 4 75 
+        canvas %= D.drawWhiteBox 24 3 4 75
         canvas %= D.drawBoard
         canvas %= drawDiscs (board $ _gameState appState) 0
-        -- canvas %= drawOptions possibles 0 newCursor p
+        let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
-        canvas %= D.drawText 22 3 ("Waiting for opponent input...") D.yellowAttr
+        canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Waiting for opponent acrtion...") D.yellowAttr
         canvas %= D.drawText 28 3 (replicate 70 ' ') D.yellowAttr
 
 
@@ -169,7 +175,6 @@ changeCursor offset = do
     appState <- get
     cursor .= (_cursor appState) + offset
     updateCanvas
-    return ()
 
 runGame :: (Int, Int) -> Disc -> EventM n AppState ()
 runGame (x, y) newPlayer = do
@@ -182,9 +187,6 @@ runGame (x, y) newPlayer = do
     case checkGameOver newBoard of
         Just (gameWinner, _) -> do
             gameOver .= True
-
-            -- TODO gameOver handling
-
             if gameWinner == Just Black then winner .= 1
             else if gameWinner == Just White then winner .= 2
             else winner .= 0
@@ -202,68 +204,41 @@ runSelfGame = do
     appState <- get
     let state = _gameState appState
     let oppo = currentPlayer state
-    
-    if oppo == _iAm appState then do
+    let newPlayer = if oppo == Black then White else Black
+    let notSingle = not (_single appState)
+
+    if _gameOver appState then do
         return ()
-    else if _gameOver appState then do
+    else if notSingle && oppo == _iAm appState then do
         return ()
     else if _noMove appState then do
-        let newPlayer = _iAm appState
+        
         let newGameState = state { currentPlayer = newPlayer }
         gameState .= newGameState
 
         -- tell the other side
-        liftIO $ do {
-            _ <- send (_conn appState) (pack (show kNO_MOVES));
-            return ()
-        }
+        when notSingle $
+            liftIO $ do {
+                _ <- send (_appConnect appState) (pack (show kNO_MOVES));
+                return ()
+            }
         updateCanvas
     else do
         let idxPair = _choice appState
-        runGame idxPair (_iAm appState)
+        runGame idxPair newPlayer
+
         -- tell the other side about your move
-        liftIO $ do {
-            _ <- send (_conn appState) (pack (show idxPair));
-            return ()
-        }
+        when notSingle $
+            liftIO $ do {
+                _ <- send (_appConnect appState) (pack (show idxPair));
+                return ()
+            }
 
 runOppoGame :: (Int, Int) -> EventM n AppState ()
 runOppoGame idxPair = do
     appState <- get
-    let oppo = if (_iAm appState) == White then Black else White
+    let oppo = if _iAm appState == White then Black else White
     runGame idxPair oppo
-
-endGame :: EventM n AppState ()
-endGame = do
-    exit .= True
-    appState <- get
-    liftIO $ do {
-        _ <- send (_conn appState) (pack (show kEXIT));
-        return ()
-    }
-    halt
-
-oppoExit :: EventM n AppState ()
-oppoExit = do
-    exit .= True
-    halt
-
-restartGame :: EventM n AppState ()
-restartGame = do
-    appState <- get
-    liftIO $ do {
-        _ <- send (_conn appState) (pack (show kRESTART));
-        return ()
-    }
-    restart .= True
-    halt
-
-oppoRestart :: EventM n AppState ()
-oppoRestart = do
-    restart .= True
-    -- to trigger updateCanvas
-    changeCursor 0
-    halt
 
 oppoNoMove :: EventM n AppState ()
 oppoNoMove = do
@@ -275,6 +250,56 @@ oppoNoMove = do
     gameState .= newGameState
     updateCanvas
 
+endGame :: EventM n AppState ()
+endGame = do
+    appState <- get
+    exit .= True
+    if _single appState then do
+        halt
+    else do
+        liftIO $ do {
+            _ <- send (_appConnect appState) (pack (show kEXIT));
+            return ()
+        }
+
+oppoExit :: EventM n AppState ()
+oppoExit = do
+    appState <- get
+    if _exit appState then do
+        halt
+    else do
+        liftIO $ do {
+            _ <- send (_appConnect appState) (pack (show kEXIT));
+            return ()
+        }
+        exit .= True
+        halt
+        
+restartGame :: EventM n AppState ()
+restartGame = do
+    appState <- get
+    restart .= True
+    if _single appState then do
+        halt
+    else do
+        liftIO $ do {
+            _ <- send (_appConnect appState) (pack (show kRESTART));
+            return ()
+        }
+
+oppoRestart :: EventM n AppState ()
+oppoRestart = do
+    appState <- get
+    if _restart appState then do
+        halt
+    else do
+        liftIO $ do {
+            _ <- send (_appConnect appState) (pack (show kRESTART));
+            return ()
+        }
+        restart .= True
+        halt
+
 handleEvent :: BrickEvent n MyEvent -> EventM n AppState ()
 handleEvent (VtyEvent (V.EvKey V.KLeft [])) = changeCursor (-1)
 handleEvent (VtyEvent (V.EvKey V.KRight [])) = changeCursor 1
@@ -285,12 +310,12 @@ handleEvent (VtyEvent (V.EvKey V.KEsc [])) = endGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'R') [])) = restartGame
 handleEvent (VtyEvent (V.EvKey (V.KChar 'r') [])) = restartGame
 handleEvent (AppEvent (SocketEvent idxPair)) = runOppoGame idxPair
-handleEvent (AppEvent (RestartEvent)) = oppoRestart
-handleEvent (AppEvent (ExitEvent)) = oppoExit
-handleEvent (AppEvent (NoMovesEvent)) = oppoNoMove
+handleEvent (AppEvent RestartEvent) = oppoRestart
+handleEvent (AppEvent ExitEvent) = oppoExit
+handleEvent (AppEvent NoMovesEvent) = oppoNoMove
 handleEvent _ = return ()
 
-pairParser :: Parser (Int, Int) 
+pairParser :: Parser (Int, Int)
 pairParser = do
   P.char '('
   x <- intParser
@@ -304,35 +329,35 @@ pairParser = do
 intParser :: Parser Int
 intParser = read <$> P.many1 P.digit
 
-runNetwork :: Socket -> BChan MyEvent -> IO ()
-runNetwork conn eventChan = do
-  -- Read from the socket, parse messages, and send events to the UI
-  forever $ do
-    chaosMsg <- recv conn 1024
-    let msg = unpack chaosMsg
-    if msg == show kRESTART then do
-        writeBChan eventChan (RestartEvent)
-    else if msg == show kEXIT then do
-        writeBChan eventChan (ExitEvent)
-    else if msg == show kNO_MOVES then do
-        writeBChan eventChan (NoMovesEvent)
-    else if msg /= "" then do
-        case P.parse pairParser "" msg of
-            Left _        -> return ()
-            Right idxPair -> writeBChan eventChan (SocketEvent idxPair)
-    else return ()
+runNetwork :: Bool -> Socket -> BChan MyEvent -> IO ()
+runNetwork isSingle conn eventChan = do
+    unless isSingle $ do
+        chaosMsg <- recv conn 1024
+        let msg = unpack chaosMsg
+        if msg == show kRESTART then do
+            writeBChan eventChan RestartEvent
+        else if msg == show kEXIT then do
+            writeBChan eventChan ExitEvent
+        else if msg == show kNO_MOVES then do
+            writeBChan eventChan NoMovesEvent
+            runNetwork isSingle conn eventChan
+        else if msg /= "" then do
+            case P.parse pairParser "" msg of
+                Left _        -> return ()
+                Right idxPair -> writeBChan eventChan (SocketEvent idxPair)
+            runNetwork isSingle conn eventChan
+        else 
+            runNetwork isSingle conn eventChan
 
-main :: Bool -> Socket -> IO Int
-main isServer conn = do
+main :: Bool -> Bool -> Socket -> IO Int
+main isSingle isServer conn = do
     eventChan <- newBChan 10
-    forkIO $ runNetwork conn eventChan
+    _ <- forkIO $ runNetwork isSingle conn eventChan
     let buildVty = VCP.mkVty Graphics.Vty.Config.defaultConfig
     initialVty <- buildVty
-    initAppState <- genInitAppState isServer conn
+    initAppState <- genInitAppState isSingle isServer conn
     nextState <- customMain initialVty buildVty (Just eventChan) app initAppState
     if _restart nextState then do
-        main isServer conn
-    else if _exit nextState then do
-        return (-1)
-    else do
+        main isSingle isServer conn
+    else 
         return 0
