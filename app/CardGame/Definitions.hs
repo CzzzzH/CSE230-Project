@@ -11,7 +11,7 @@ data Player = Player {
     wonCards :: [Card],   -- 赢得的牌
     pendingCards :: [Card], -- 平局时积累的牌
     randomGen :: StdGen    -- 随机生成器
-} deriving (Show)
+} deriving (Eq, Show)
 
 -- 初始化一个完整的牌组
 fullDeck :: [Card]

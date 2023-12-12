@@ -25,16 +25,31 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      CardGame.CardGameUI
+      CardGame.Definitions
+      CardGame.GameLogic
+      Draw
+      Main
+      Othello.GameLogic
+      Othello.OthelloUI
   other-modules:
       Paths_CGA
   autogen-modules:
       Paths_CGA
   hs-source-dirs:
-      src
+      app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , brick
+    , bytestring
+    , containers
+    , lens
+    , network
+    , parsec
+    , random
+    , vty
+    , vty-crossplatform
   default-language: Haskell2010
 
 executable CGA-exe
@@ -81,5 +96,13 @@ test-suite CGA-test
       CGA
     , QuickCheck
     , base >=4.7 && <5
+    , brick
+    , bytestring
+    , containers
+    , lens
+    , network
+    , parsec
     , random
+    , vty
+    , vty-crossplatform
   default-language: Haskell2010
