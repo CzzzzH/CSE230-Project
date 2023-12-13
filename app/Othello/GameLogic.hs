@@ -20,7 +20,7 @@ data Disc = Black | White | Empty  -- 添加一个 Empty 选项作为占位符
     deriving (Eq, Show)
 
 -- 定义棋盘格
-type Cell = Disc  -- 直接使用 Disc 不再是 Maybe Disc
+type Cell = Disc
 
 -- 定义棋盘
 type Board = [[Cell]]

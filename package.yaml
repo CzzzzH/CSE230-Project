@@ -21,6 +21,15 @@ description:         Please see the README on GitHub at <https://github.com/gith
 
 dependencies:
 - base >= 4.7 && < 5
+- lens
+- brick
+- containers
+- vty
+- vty-crossplatform
+- random
+- network
+- bytestring
+- parsec
 
 ghc-options:
 - -Wall
@@ -34,7 +43,7 @@ ghc-options:
 - -Wredundant-constraints
 
 library:
-  source-dirs: src
+  source-dirs: app
 
 executables:
   CGA-exe:
@@ -46,15 +55,6 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - CGA
-    - lens
-    - brick
-    - containers
-    - vty
-    - vty-crossplatform
-    - random
-    - network
-    - bytestring
-    - parsec
 
 tests:
   CGA-test:
@@ -66,5 +66,4 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - CGA
-    - random
     - QuickCheck
