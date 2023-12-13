@@ -1,7 +1,11 @@
+import Test.HUnit hiding (Testable)
 import Test.QuickCheck
 import System.Random (newStdGen, randomR, StdGen)
 import CardTest
+import OthelloTest
 
+othello_tests = TestList [testIsValidPos, testFlipLine, testFlipDisc, testIsPlayablePos, 
+                  testCheckGameOverTrue, testCheckGameOverFalse]
 
 runTest :: Testable prop => String -> prop -> IO ()
 runTest name prop = do
@@ -16,4 +20,8 @@ main = do
     runTest "prop_getCard " prop_getCard 
     runTest "prop_updateState" prop_updateState
 
-    putStrLn "All tests completed!"
+    putStrLn "All Card Game tests completed!"
+
+    putStrLn "Running Othello HUnit tests..."
+    _ <- runTestTT othello_tests
+    putStrLn "All Othello HUnit tests completed!"

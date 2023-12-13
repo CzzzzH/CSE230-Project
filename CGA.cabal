@@ -86,6 +86,7 @@ test-suite CGA-test
   main-is: Spec.hs
   other-modules:
       CardTest
+      OthelloTest
       Paths_CGA
   autogen-modules:
       Paths_CGA
@@ -103,6 +104,7 @@ test-suite CGA-test
     , network
     , parsec
     , random
+    , HUnit
     , vty
     , vty-crossplatform
   default-language: Haskell2010
