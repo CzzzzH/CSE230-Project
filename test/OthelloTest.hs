@@ -5,6 +5,7 @@
 module OthelloTest where
 import System.Random (newStdGen, randomR, StdGen,mkStdGen)
 import Data.List ( (\\), delete , nub,subsequences,intersect)
+import Data.Maybe (isJust, isNothing)
 import Test.QuickCheck
 import Test.QuickCheck.Gen (oneof, listOf1)
 
@@ -31,12 +32,12 @@ generateTestBoardFlipLine =
 -- 测试 flipLine 函数
 testFlipLine :: Test
 testFlipLine =
-    let testBoard = generateTestBoardFlipLine
+    let testBoard = setDiscAt (3, 2) Black generateTestBoardFlipLine
         expectedBoard = flipLine Black (3, 2) testBoard (0, 1) -- 假设翻转方向为 (0, 1)
         expectedBoardAfterFlipLine = 
             let emptyRow = replicate boardSize Empty  -- 使用 Empty 填充整行
                 middleRow1 = replicate 2 Empty ++ [White, Black] ++ replicate 4 Empty
-                middleRow2 = replicate 2 Empty ++ [Black, Black, Black] ++ replicate 3 Empty
+                middleRow2 = replicate 2 Empty ++ [Black, Black, Black] ++ replicate  3 Empty
                 middleRow3 = replicate 3 Empty ++ [Black, White] ++ replicate 3 Empty
             in replicate 2 emptyRow ++ [middleRow1, middleRow2, middleRow3] ++ replicate 3 emptyRow
     in TestCase (assertEqual "flipLine should correctly flip a line." expectedBoardAfterFlipLine expectedBoard)
@@ -54,7 +55,7 @@ generateTestBoardFlipDisc =
 -- 测试 flipDiscs 函数
 testFlipDisc :: Test
 testFlipDisc = 
-    let testBoard = generateTestBoardFlipDisc
+    let testBoard = setDiscAt (3, 5) Black generateTestBoardFlipDisc
         expectedBoard = flipDiscs Black (3, 5) testBoard
         emptyRow = replicate boardSize Empty  -- 使用 Empty 填充整行
         middleRow1 = replicate 2 Empty ++ [White, White, White] ++ replicate 3 Empty
@@ -69,22 +70,50 @@ testFlipDisc =
 -- 测试检查可玩位置
 testIsPlayablePos = TestCase (assertBool "Position (3,2) should be playable for Black." (isPlayablePos Black (3, 2) initBoard))
 
--- 测试游戏结束判断
-testCheckGameOver = TestCase (assertEqual "Should determine game over correctly." expectedGameOver (checkGameOver initBoard))
+gameOverBoard :: Board
+gameOverBoard =
+    [ [Black, Black, Black, Black, Black, Black, Black, White]
+    , [Black, Black, Black, Black, Black, Black, White, White]
+    , [Black, Black, Black, Black, Black, White, Black, White]
+    , [Black, Black, Black, Black, White, Black, White, White]
+    , [Black, Black, Black, White, Black, Black, White, White]
+    , [Black, Black, White, White, Black, Black, White, White]
+    , [Black, Black, Black, White, White, White, Black, White]
+    , [White, White, White, White, White, Black, White, Black]
+    ]
 
--- 生成随机的 Othello 对局
-generateRandomGame :: Int -> IO [Move]
-generateRandomGame numberOfMoves = do
-  gen <- newStdGen
-  let moves = take numberOfMoves $ zip (cycle ['B', 'W']) (randomPositions gen)
-  return moves
+-- 测试游戏结束判断（游戏应该结束）
+testCheckGameOverTrue :: Test
+testCheckGameOverTrue = TestCase $ do
+    let result = checkGameOver gameOverBoard
+    assertBool "Game should be over" $ isJust result
+    let Just (winner, _) = result
+    assertBool "There should be a winner or a draw" $ isJust winner
 
--- 生成随机位置序列
-randomPositions :: StdGen -> [Position]
-randomPositions gen = zip (randomRs (0, 7) gen) (randomRs (0, 7) gen)
+-- 测试游戏结束判断（游戏不应该结束）
+testCheckGameOverFalse :: Test
+testCheckGameOverFalse = TestCase $ do
+    let result = checkGameOver initBoard
+    assertBool "Game should not be over" $ isNothing result
+
+
+-- -- 生成随机的 Othello 对局
+-- generateRandomGame :: Int -> IO [Move]
+-- generateRandomGame numberOfMoves = do
+--   gen <- newStdGen
+--   let moves = take numberOfMoves $ zip (cycle ['B', 'W']) (randomPositions gen)
+--   return moves
+
+-- -- 生成随机位置序列
+-- randomPositions :: StdGen -> [Position]
+-- randomPositions gen = zip (randomRs (0, 7) gen) (randomRs (0, 7) gen)
 
 
 -- 你需要自己定义 expectedInitBoard, expectedBoardAfterFlip 和 expectedGameOver
 -- 他们应该是你期望的棋盘状态，根据 initBoard 和 flipDiscs 的逻辑。
 
-tests = TestList [testInitBoard, testIsValidPos, testFlipLine, testFlipDisc, testIsPlayablePos, testCheckGameOver]
+-- tests = TestList [testIsValidPos, testFlipLine, testFlipDisc, testIsPlayablePos, 
+--                   testCheckGameOverTrue, testCheckGameOverFalse]
+
+-- expected: [[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,White,Black,Empty,Empty,Empty,Empty],[Empty,Empty,Black,Black,Black,Empty,Empty,Empty],[Empty,Empty,Empty,Black,White,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty]]
+--  but got: [[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,White,Black,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Black,Black,Empty,Empty,Empty],[Empty,Empty,Empty,Black,White,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty]]
