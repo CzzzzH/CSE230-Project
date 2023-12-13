@@ -1,7 +1,7 @@
 import Test.QuickCheck
 import System.Random (newStdGen, randomR, StdGen)
 import CardTest
-
+import OthelloTest
 
 runTest :: Testable prop => String -> prop -> IO ()
 runTest name prop = do
@@ -16,4 +16,4 @@ main = do
     runTest "prop_getCard " prop_getCard 
     runTest "prop_updateState" prop_updateState
 
-    putStrLn "All tests completed!"
+    putStrLn "All Card Game tests completed!"

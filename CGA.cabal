@@ -71,6 +71,7 @@ test-suite CGA-test
   main-is: Spec.hs
   other-modules:
       CardTest
+      OthelloTest
       Paths_CGA
   autogen-modules:
       Paths_CGA
@@ -82,4 +83,5 @@ test-suite CGA-test
     , QuickCheck
     , base >=4.7 && <5
     , random
+    , HUnit
   default-language: Haskell2010
