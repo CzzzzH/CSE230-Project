@@ -163,7 +163,7 @@ updateCanvas = do
 
     -- Updates Round Result
     when (_winner appState /= -1) $ do
-        canvas %= D.drawText 29 3  (replicate 50 ' ') D.yellowAttr
+        canvas %= D.drawText 28 3  (replicate 70 ' ') D.yellowAttr
         let (roundWinnerStr, roundWinnerColor)
                 | _winner appState == 1 && p1 = (" You won this round!", D.yellowAttr)
                 | _winner appState == 1 && not p1 = (" You lost this round!", D.yellowAttr)
@@ -184,7 +184,7 @@ updateCanvas = do
     if _gameOver appState then do
         let total1 = length (wonCards $ _self appState)
         let total2 = length (wonCards $ _oppo appState)
-        canvas %= D.drawText 29 3 (replicate 50 ' ') D.yellowAttr
+        canvas %= D.drawText 29 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 29 3 "Game Over! " D.yellowAttr
         if total1 > total2 then do
             canvas %= D.drawText 29 14 "You win! Press [R] to start a new game" D.yellowAttr
@@ -194,7 +194,10 @@ updateCanvas = do
             canvas %= D.drawText 29 14 "Draw! Press [R] to start a new game" D.yellowAttr
     else do
         -- Update Cursor (make everything white if it is not your turn)
+        canvas %= D.drawText 29 3 "It's your turn! Choose one of your hand cards" D.yellowAttr
         unless (_isMyTurn appState) $ do
+            canvas %= D.drawText 29 3 (replicate 70 ' ') D.yellowAttr
+            canvas %= D.drawText 29 3 "Waiting for opponent's choice..." D.yellowAttr
             canvas %= D.changeColor myRow 5 (myRow + 5) 75 D.whiteAttr
 
 changeCursor :: Int -> EventM n AppState ()
