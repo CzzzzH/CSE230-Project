@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant if" #-}
 
 module Othello.OthelloUI where
 import Othello.GameLogic
@@ -19,12 +21,13 @@ import qualified Draw as D
 import Network.Socket
 import Network.Socket.ByteString (send, recv)
 import Control.Concurrent (forkIO)
-import Control.Exception (bracket)
 import Data.ByteString.Char8 as BS (pack, unpack)
 import qualified Text.Parsec as P
 import Text.Parsec.String (Parser)
-import Control.Monad (forever, unless, when)
+import Control.Monad (unless, when)
 import Control.Monad.IO.Class (liftIO)
+
+import System.Random (randomRIO)
 
 data AppState = AppState {
     _gameState :: GameState,
@@ -123,15 +126,17 @@ updateCanvas = do
     let p = currentPlayer $ _gameState appState
     let b = board $ _gameState appState
     if _gameOver appState then do
-        let winnerStr 
-              |  _winner appState == 1 = "Black win  " 
-              |  _winner appState == 2 = "White win  "
+        let winnerStr
+              |  _winner appState == 1 && _iAm appState == Black = "Black win (You win)! "
+              |  _winner appState == 1 && _iAm appState == White = "Black win (You lose)! "
+              |  _winner appState == 2 && _iAm appState == White = "White win (You win)! "
+              |  _winner appState == 2 && _iAm appState == Black = "White win (You lose)! "
               |  otherwise = "Draw  "
         canvas %= D.drawWhiteBox 24 3 6 75
         canvas %= D.drawBoard
         canvas %= drawDiscs (board $ _gameState appState) 0
         canvas %= D.drawText 28 3 "Game Over!" D.yellowAttr
-        canvas %= D.drawText 28 15 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
+        canvas %= D.drawText 28 14 (winnerStr ++ "Press [R] to start a new game") D.yellowAttr
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
         canvas %= D.drawText 24 3 (replicate 70 ' ') D.yellowAttr
     else if p == _iAm appState ||  _single appState  then do
@@ -159,15 +164,16 @@ updateCanvas = do
             canvas %= drawDiscs (board $ _gameState appState) 0
             canvas %= drawOptions possibles 0 newCursor p
             noMove .= False
-            canvas %= D.drawText 28 3 "Select a move from above options!" D.yellowAttr
+            canvas %= D.drawText 28 3 ("You are " ++ show (_iAm appState) ++ " player! Select a move from above options") D.yellowAttr
     else do
         canvas %= D.drawWhiteBox 24 3 4 75
         canvas %= D.drawBoard
         canvas %= drawDiscs (board $ _gameState appState) 0
         let playerName = if p == Black then "Black" else "White"
         canvas %= D.drawText 22 3 (replicate 70 ' ') D.yellowAttr
-        canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Waiting for opponent acrtion...") D.yellowAttr
+        canvas %= D.drawText 22 3 ("Current Player: " ++ playerName ++ "!  Waiting for opponent's move...") D.yellowAttr
         canvas %= D.drawText 28 3 (replicate 70 ' ') D.yellowAttr
+        canvas %= D.drawText 28 3 ("You are " ++ show (_iAm appState) ++ " player!") D.yellowAttr
 
 
 changeCursor :: Int -> EventM n AppState ()
@@ -205,19 +211,15 @@ runSelfGame = do
     let state = _gameState appState
     let cp = currentPlayer state
     let newPlayer = if cp == Black then White else Black
-    let notSingle = not (_single appState)
 
     if _gameOver appState then do
         return ()
-    else if notSingle && cp /= _iAm appState then do
+    else if cp /= _iAm appState then do
         return ()
     else if _noMove appState then do
-        
-        let newGameState = state { currentPlayer = newPlayer }
-        gameState .= newGameState
-
-        -- tell the other side
-        when notSingle $
+        gameState .= state { currentPlayer = newPlayer }
+        -- Tell the other side about your move
+        unless (_single appState) $ do
             liftIO $ do {
                 _ <- send (_appConnect appState) (pack (show kNO_MOVES));
                 return ()
@@ -226,13 +228,31 @@ runSelfGame = do
     else do
         let idxPair = _choice appState
         runGame idxPair newPlayer
-
-        -- tell the other side about your move
-        when notSingle $
+        -- Tell the other side about your move
+        unless (_single appState) $ do
             liftIO $ do {
                 _ <- send (_appConnect appState) (pack (show idxPair));
                 return ()
             }
+
+    -- Run bot's playing
+    when (_single appState) $ do
+        botAppState <- get
+        let botState = _gameState botAppState
+        let botCp = currentPlayer botState
+        let botNewPlayer = if botCp == Black then White else Black
+        if _gameOver botAppState then do
+            return ()
+        else if _noMove botAppState then do
+            let botNewGameState = botState { currentPlayer = botNewPlayer }
+            gameState .= botNewGameState
+            updateCanvas
+        else do
+            let allPositions = [(x, y) | x <- [0..boardSize - 1], y <- [0..boardSize - 1]]
+            let possibles = filter (\pos -> isPlayablePos botCp pos (board botState)) allPositions
+            randomNum <- liftIO $ randomRIO (0, length possibles - 1)
+            let idxPair = possibles !! randomNum
+            runGame idxPair botNewPlayer
 
 runOppoGame :: (Int, Int) -> EventM n AppState ()
 runOppoGame idxPair = do
@@ -273,7 +293,7 @@ oppoExit = do
         }
         exit .= True
         halt
-        
+
 restartGame :: EventM n AppState ()
 restartGame = do
     appState <- get
@@ -345,7 +365,7 @@ runNetwork isSingle conn eventChan = do
                 Left _        -> return ()
                 Right idxPair -> writeBChan eventChan (SocketEvent idxPair)
             runNetwork isSingle conn eventChan
-        else 
+        else
             runNetwork isSingle conn eventChan
 
 main :: Bool -> Bool -> Socket -> IO Int
@@ -358,5 +378,5 @@ main isSingle isServer conn = do
     nextState <- customMain initialVty buildVty (Just eventChan) app initAppState
     if _restart nextState then do
         main isSingle isServer conn
-    else 
+    else
         return 0
