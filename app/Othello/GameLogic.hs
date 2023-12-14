@@ -10,6 +10,8 @@ import Control.Monad (forever)
 import Debug.Trace
 import System.Exit (exitSuccess)
 import Data.List (intercalate)
+import System.Random (randomRIO)
+import System.IO
 
 -- 定义棋盘大小
 boardSize :: Int
@@ -20,7 +22,7 @@ data Disc = Black | White | Empty  -- 添加一个 Empty 选项作为占位符
     deriving (Eq, Show)
 
 -- 定义棋盘格
-type Cell = Disc  -- 直接使用 Disc 不再是 Maybe Disc
+type Cell = Disc
 
 -- 定义棋盘
 type Board = [[Cell]]
@@ -163,7 +165,7 @@ checkGameOver board
       | blackCount > whiteCount = Just Black
       | whiteCount > blackCount = Just White
       | otherwise = Nothing
-    resultMessage = "Black: " ++ show blackCount ++ ", White: " ++ show whiteCount
+    resultMessage = "\nBlack: " ++ show blackCount ++ ", White: " ++ show whiteCount
 
 -- 计算棋盘上特定棋子的数量
 countDiscs :: Disc -> Board -> Int
@@ -181,14 +183,17 @@ isValidMove :: Disc -> Position -> Board -> Bool
 isValidMove player pos board = isValidPos pos board && isPlayablePos player pos board
 
 -- 解析输入为坐标
--- parseInput :: String -> IO (Maybe Position)
--- parseInput input = do
---     putStrLn $ "You entered: " ++ input -- 打印玩家的输入
---     return $ case mapM readMaybe (words input) of
---         Just [x, y] -> Just (x, y)
---         _ -> Nothing
+parseInput :: String -> IO (Maybe Position)
+parseInput input = do
+    putStrLn $ "You entered: " ++ input -- 打印玩家的输入
+    return $ case mapM readMaybe (words input) of
+        Just [x, y] -> Just (x, y)
+        _ -> Nothing
 
--- 无效落子处理
+
+-- 接下来的函数为了直接在Unit test中测试游戏的对局是否正常，绕过UI和IO，直接调用核心逻辑
+
+-- -- 无效落子处理
 -- invalidMove :: Disc -> Board -> IO (Maybe Position)
 -- invalidMove player board = do
 --     putStrLn "Invalid move. Please try again."
@@ -213,43 +218,96 @@ isValidMove player pos board = isValidPos pos board && isPlayablePos player pos 
 --                         then return $ Just pos
 --                         else invalidMove player board
 --             Nothing -> invalidMove player board
+-- 无效落子处理
+-- invalidMove :: Disc -> Board -> IO [Position]
+-- invalidMove player board = do
+--     putStrLn "Invalid move. Please try again."
+--     chooseRandomPlayerMove player board
 
--- runGame :: GameState -> IO ()
--- runGame gameState = forever $ do
---     -- 显示当前棋盘
---     -- putStrLn $ drawUI gameState
---     putStrLn $ boardToStr $ board gameState
+-- 获取玩家移动
+getPlayerMovablePos :: Disc -> Board -> IO [Position]
+getPlayerMovablePos player board = do
+    let possibleMoves = filter (\pos -> isPlayablePos player pos board) allPositions
+        allPositions = [(x, y) | x <- [0..boardSize - 1], y <- [0..boardSize - 1]]
 
---     -- 获取玩家移动
---     moveMaybe <- getPlayerMove (currentPlayer gameState) (board gameState)
+    if null possibleMoves
+    then do
+        -- putStrLn $ "Player " ++ show player ++ " has no valid moves."
+        return []
+    else do
+        -- putStrLn $ "Player " ++ show player ++ ", possible moves: " ++ show possibleMoves
+        return possibleMoves
 
---     case moveMaybe of
---         Just move -> do
---             -- 玩家有有效的移动
---             let newBoard = flipDiscs (currentPlayer gameState) move (board gameState)
---             let nextPlayer = if currentPlayer gameState == Black then White else Black
+-- 随机选择玩家的一个可行移动
+chooseRandomPlayerMove :: Disc -> Board -> IO (Maybe Position)
+chooseRandomPlayerMove player board = do
+    possibleMoves <- getPlayerMovablePos player board
+    if null possibleMoves
+    then return Nothing
+    else do
+        idx <- randomRIO (0, length possibleMoves - 1)
+        return $ Just (possibleMoves !! idx)
 
---             -- 检查游戏是否结束
---             case checkGameOver newBoard of
---                 Just (winner, message) -> do
---                     putStrLn message
---                     if winner == Just Black then putStrLn "Black wins!"
---                     else if winner == Just White then putStrLn "White wins!"
---                     else putStrLn "It's a draw!"
---                     exitSuccess  -- 结束游戏
---                 Nothing -> do
---                     let newGameState = gameState { board = newBoard, currentPlayer = nextPlayer }
---                     runGame newGameState  -- 继续下一个回合
 
---         Nothing -> do
---             -- 当前玩家没有有效的移动
---             let nextPlayer = if currentPlayer gameState == Black then White else Black
---             if anyMovesPossible nextPlayer (board gameState) then do
---                 putStrLn $ "Player " ++ show (currentPlayer gameState) ++ " has no valid moves. Skipping turn."
---                 let newGameState = gameState { currentPlayer = nextPlayer }
---                 runGame newGameState
---             else do
---                 -- 如果双方都没有有效的移动，游戏结束
---                 putStrLn "Neither player has valid moves. Game over."
---                 -- 可以在这里添加计算分数并宣布胜者的逻辑
---                 exitSuccess
+cellToStrUT :: Disc -> String
+cellToStrUT Empty = "   "
+cellToStrUT Black = " ○ "
+cellToStrUT White = " ● "
+
+boardToStrUT :: Board -> String
+boardToStrUT board = 
+    let topBorder = "╔" ++ concat (replicate 7 "═══╦") ++ "═══╗\n"
+        middleBorder = "╠" ++ concat (replicate 7 "═══╬") ++ "═══╣\n"
+        bottomBorder = "╚" ++ concat (replicate 7 "═══╩") ++ "═══╝\n"
+        rowToStr row = "║" ++ intercalate "║" (map cellToStrUT row) ++ "║\n"
+    in topBorder ++ intercalate middleBorder (map rowToStr board) ++ bottomBorder
+
+runGameRandom :: GameState -> Int -> IO ()
+runGameRandom gameState step = do
+    -- 显示当前棋盘
+    -- putStrLn $ drawUI gameState
+    -- putStrLn $ "current step:" ++ show step
+    -- 玩家移动
+
+    -- 获取玩家移动
+    moveMaybe <- chooseRandomPlayerMove (currentPlayer gameState) (board gameState)
+
+    case moveMaybe of
+        Just move -> do
+            -- 玩家有有效的移动
+            let newBoard = flipDiscs (currentPlayer gameState) move (board gameState)
+            let nextPlayer = if currentPlayer gameState == Black then White else Black
+
+            -- 检查游戏是否结束
+            case checkGameOver newBoard of
+                Just (winner, message) -> do
+                    putStrLn message
+                    if winner == Just Black then putStrLn "Black wins!"
+                    else if winner == Just White then putStrLn "White wins!"
+                    else putStrLn "It's a draw!"
+                    
+                    putStrLn $ boardToStrUT $ newBoard
+                    return ()  -- 结束游戏
+                Nothing -> do
+                    let newGameState = gameState { board = newBoard, currentPlayer = nextPlayer }
+                    runGameRandom newGameState (step+1)  -- 继续下一个回合
+
+        Nothing -> do
+            -- 当前玩家没有有效的移动
+            let nextPlayer = if currentPlayer gameState == Black then White else Black
+            if anyMovesPossible nextPlayer (board gameState) then do
+                -- putStrLn $ "Player " ++ show (currentPlayer gameState) ++ " has no valid moves. Skipping turn."
+                let newGameState = gameState { currentPlayer = nextPlayer }
+                runGameRandom newGameState (step+1)
+            else do
+                -- 如果双方都没有有效的移动，游戏结束
+                putStrLn "Neither player has valid moves. Game over."
+                -- 可以在这里添加计算分数并宣布胜者的逻辑
+                case checkGameOver (board gameState) of
+                    Just (winner, message) -> do
+                        putStrLn message
+                        if winner == Just Black then putStrLn "Black wins!"
+                        else if winner == Just White then putStrLn "White wins!"
+                        else putStrLn "It's a draw!"
+                    Nothing -> putStrLn "It's a draw!"
+                return ()

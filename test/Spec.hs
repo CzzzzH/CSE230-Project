@@ -5,7 +5,7 @@ import CardTest
 import OthelloTest
 
 othello_tests = TestList [testIsValidPos, testFlipLine, testFlipDisc, testIsPlayablePos, 
-                  testCheckGameOverTrue, testCheckGameOverFalse]
+                  testCheckGameOverTrue, testCheckGameOverFalse, generateRandomGame]
 
 runTest :: Testable prop => String -> prop -> IO ()
 runTest name prop = do

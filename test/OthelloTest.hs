@@ -8,6 +8,7 @@ import Data.List ( (\\), delete , nub,subsequences,intersect)
 import Data.Maybe (isJust, isNothing)
 import Test.QuickCheck
 import Test.QuickCheck.Gen (oneof, listOf1)
+import Control.Monad (replicateM_)
 
 import Othello.GameLogic
 import Test.HUnit
@@ -98,11 +99,9 @@ testCheckGameOverFalse = TestCase $ do
 
 
 -- -- 生成随机的 Othello 对局
--- generateRandomGame :: Int -> IO [Move]
--- generateRandomGame numberOfMoves = do
---   gen <- newStdGen
---   let moves = take numberOfMoves $ zip (cycle ['B', 'W']) (randomPositions gen)
---   return moves
+generateRandomGame :: Test
+generateRandomGame = TestCase $ do
+    replicateM_ 1000 (runGameRandom initState 0)
 
 -- -- 生成随机位置序列
 -- randomPositions :: StdGen -> [Position]
