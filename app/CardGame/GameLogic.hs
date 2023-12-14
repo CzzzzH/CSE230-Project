@@ -2,7 +2,7 @@ module CardGame.GameLogic where
 
 import CardGame.Definitions ( Player(..), Card, fullDeck )
 import System.Random (newStdGen, randomR, StdGen)
-import Data.List ( (\\), delete )
+import Data.List ( delete )
 
 -- 从牌组选择一张牌并返回选择的牌和剩下的牌组
 select :: [Card] -> StdGen -> (Card, [Card], StdGen)
