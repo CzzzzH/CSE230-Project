@@ -213,7 +213,7 @@ startClient = do
     addr <- resolve host port
     conn <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
     connect conn (addrAddress addr)
-    let connHint = "Two Player Mode (connected with " ++ show (addrAddress addr) ++ ")"
+    let connHint = "Two-Player Mode (connected with " ++ show (addrAddress addr) ++ ")"
     let initialAppState = AppState { _cursor = 0, _currentApp = 0, _canvas = drawMenu,  _appConnect = conn,
                                      _appConnectHint = connHint, _single = False, _quit = False}
     runMenu conn initialAppState False False
