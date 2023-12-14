@@ -157,9 +157,9 @@ runMenu conn currentState isSingle isServer = do
         if errorCode == -1 then do return () else do
             runMenu conn currentState {_currentApp = 0} isSingle isServer 
     else if _currentApp currentState == 2 then do
-        errorCode <- C.main isServer conn
+        errorCode <- C.main isSingle isServer conn
         if errorCode == -1 then do return () else do
-            runMenu conn currentState {_currentApp = 0} False isServer
+            runMenu conn currentState {_currentApp = 0} isSingle isServer
     else do
         eventChan <- newBChan 20
         _ <- forkIO $ runNetwork isSingle isServer conn eventChan
@@ -220,7 +220,7 @@ startClient = do
 
 main :: IO ()
 main = do
-    putStrLn "Choose APP mode: (1) Server (2) Client (3) Single Player [only for Othello] (Q) Quit APP"
+    putStrLn "Choose APP mode: (1) Server (2) Client (3) Single Player (Q) Quit APP"
     mode <- getLine
     case mode of
         "1" -> startServer False

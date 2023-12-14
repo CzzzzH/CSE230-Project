@@ -1,16 +1,5 @@
 module Othello.GameLogic where
 
-import qualified Brick.Main as M
-import Brick.Types (Widget)
-import Brick.Widgets.Core (str, vBox)
-import Brick.AttrMap (attrMap)
-import Brick.Util (on)
-import Text.Read (readMaybe)
-import Control.Monad (forever)
-import Debug.Trace
-import System.Exit (exitSuccess)
-import Data.List (intercalate)
-
 -- 定义棋盘大小
 boardSize :: Int
 boardSize = 8
