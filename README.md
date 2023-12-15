@@ -17,12 +17,15 @@ stack run
 stack test
 ```
 
+## Milestone 3: Completion
+
+In this milestone, we not only completed the content of step 3, but also addressed and fixed bugs present in the interface and logic.
 
 ## Milestone 2: Update
 
 In this milestone, we have finished the whole **step 1** and part of **step 2** in our previous goals.
 
-We have made a complete TUI application with a menu to choose game (the codes are at the git branch **CGA**). The key components of our application include a TUI client, where the players can choose a game to play (currently in single-player mode but then the network connection would be added). Each game itself is also a component, which contains the TUI and the game logic.
+We have made a complete TUI application with a menu to choose game (the codes are at the git branch **CGA**). The key components of our application include a TUI client, where the players can choose a game to play (single-player mode/ online two-player mode). Each game itself is also a component, which contains the TUI and the game logic.
 
 ![menu](menu.png)
 
@@ -50,7 +53,7 @@ Initially, each player receives three randomly drawn cards from their deck. Game
 
 Tips:
 + Each player has a deck consisting of 2, 3, 4, 5, 6, 7, 8, 9, 10, J, Q, K, and A, a total of 13 cards. The card values increase from 2 to A.
-+ Card values remain hidden until they are compared.
++ Players can only see the cards in their own hands.
 + After each comparison, a new card is randomly drawn from the deck to replenish their hand, keeping it at three cards until there are no more cards in the deck.
 
 
@@ -65,6 +68,7 @@ This project consists of the following goals organized as milestones.
 #### Step 2
 + Complete TUI for each game with the [Brick](https://github.com/jtdaugherty/brick/) library
 + Networking support for two-player mode
++ Single-player mode, where the opposing player is controlled by computer
 #### Step 3
 + Unit testing support either manually or using [quickcheck](https://hackage.haskell.org/package/QuickCheck)
 + Complete platform TUI with several user functions  (e.g. start menu, ranking board, etc)
