@@ -19,13 +19,14 @@ stack test
 
 ## Milestone 3: Completion
 
-In this milestone, we not only completed the content of step 3, but also addressed and fixed bugs present in the interface and logic.
+In this milestone, we not only completed the content of step 3, supplemented and optimized the unfinished aspects of step 2 (single-player mode/ online two-player mode), and addressed and fixed bugs present in the interface and game logic. 
+
 
 ## Milestone 2: Update
 
 In this milestone, we have finished the whole **step 1** and part of **step 2** in our previous goals.
 
-We have made a complete TUI application with a menu to choose game (the codes are at the git branch **CGA**). The key components of our application include a TUI client, where the players can choose a game to play (single-player mode/ online two-player mode). Each game itself is also a component, which contains the TUI and the game logic.
+We have made a complete TUI application with a menu to choose game (the codes are at the git branch **CGA**). The key components of our application include a TUI client, where the players can choose a game to play (currently in single-player mode but then the network connection would be added). Each game itself is also a component, which contains the TUI and the game logic.
 
 ![menu](menu.png)
 
